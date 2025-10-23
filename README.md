@@ -8,7 +8,7 @@ Una versión mejorada del clásico juego Asteroids utilizando física realista c
 
 ## Demo
 
-[Jugar Ahora](#) 
+[Jugar Ahora](https://asteroides-phisics.netlify.app/) 
 
 ## Características
 - **Física realista** con motor p2.js
@@ -143,7 +143,7 @@ gameManager = {
 - [ ] Soporte para gamepad
 - [ ] Estadísticas detalladas
 
-## 🤝 Contribuir
+## Contribuir
 
 ¿Tienes ideas para mejorar el juego? ¡Las contribuciones son bienvenidas!
 
