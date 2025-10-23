@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Asteroids Enhanced - p2.js</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p2.js/0.7.1/p2.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #000;
+        }
+
+        .hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        .hud-item {
+            margin-bottom: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            min-width: 150px;
+        }
+
+        .hud-label {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 40px 60px;
+            border-radius: 15px;
+            border: 2px solid #00ff88;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .overlay h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #00ff88;
+            text-shadow: 0 0 20px #00ff88;
+        }
+
+        .overlay p {
+            font-size: 18px;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .overlay button {
+            margin-top: 20px;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            background: linear-gradient(135deg, #00ff88 0%, #00cc6a 100%);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .overlay button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #00ff88;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            text-align: center;
+            opacity: 0.4;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        .controls:hover {
+            opacity: 1;
+        }
+
+        .controls kbd {
+            background: #222;
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid #444;
+            margin: 0 1px;
+            font-family: inherit;
+            font-size: 11px;
+        }
+
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 180px;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .mobile-controls-left {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .mobile-controls-right {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .mobile-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        .mobile-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.9);
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .mobile-btn.thrust {
+            width: 80px;
+            height: 80px;
+            font-size: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+            .controls {
+                display: none;
+            }
+        }
+
+        @media (min-height: 600px) and (max-width: 768px) {
+            .mobile-controls {
+                height: 200px;
+            }
+            .mobile-controls-left,
+            .mobile-controls-right {
+                bottom: 40px;
+            }
+        }
+
+        .particle {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        @keyframes fadeOut {
+            to {
+                opacity: 0;
+                transform: scale(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="hud">
+        <div class="hud-item"><span class="hud-label">NIVEL:</span> <span id="level">1</span></div>
+        <div class="hud-item"><span class="hud-label">VIDAS:</span> <span id="lives">3</span></div>
+        <div class="hud-item"><span class="hud-label">PUNTOS:</span> <span id="score">0</span></div>
+    </div>
+
+    <div id="startScreen" class="overlay">
+        <h1>ASTEROIDS</h1>
+        <p>Destruye todos los asteroides para avanzar</p>
+        <p style="margin-top: 20px;">
+            <kbd>←</kbd> <kbd>→</kbd> Girar<br>
+            <kbd>↑</kbd> Impulso<br>
+            <kbd>ESPACIO</kbd> Disparar<br>
+            <kbd>P</kbd> Pausa
+        </p>
+        <button onclick="gameManager.start()">INICIAR JUEGO</button>
+    </div>
+
+    <div id="pauseScreen" class="overlay hidden">
+        <h1>PAUSA</h1>
+        <p>Presiona <kbd>P</kbd> para continuar</p>
+    </div>
+
+    <div id="gameOverScreen" class="overlay hidden">
+        <h1>GAME OVER</h1>
+        <p>Puntuación Final: <span id="finalScore">0</span></p>
+        <p>Nivel Alcanzado: <span id="finalLevel">1</span></p>
+        <button onclick="gameManager.restart()">REINTENTAR</button>
+    </div>
+
+    <div class="controls">
+        <kbd>←</kbd><kbd>→</kbd> Girar | <kbd>↑</kbd> Impulso | <kbd>ESPACIO</kbd> Disparar | <kbd>P</kbd> Pausa
+    </div>
+
+    <div class="mobile-controls">
+        <div class="mobile-controls-left">
+            <div class="mobile-btn" id="btnLeft">◄</div>
+            <div class="mobile-btn" id="btnRight">►</div>
+        </div>
+        <div class="mobile-controls-right">
+            <div class="mobile-btn thrust" id="btnUp">▲</div>
+            <div class="mobile-btn" id="btnShoot">●</div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración del juego
+        const CONFIG = {
+            ship: {
+                size: 0.3,
+                turnSpeed: 4,
+                reloadTime: 0.15,
+                maxSpeed: 5
+            },
+            bullet: {
+                radius: 0.03,
+                lifeTime: 2,
+                speed: 3,
+                maxCount: 20
+            },
+            asteroid: {
+                radius: 0.9,
+                levels: 4,
+                maxSpeed: 2,
+                verts: 10,
+                minDistance: 2
+            },
+            space: {
+                width: 16,
+                height: 9
+            },
+            collision: {
+                SHIP: Math.pow(2, 1),
+                BULLET: Math.pow(2, 2),
+                ASTEROID: Math.pow(2, 3)
+            },
+            points: {
+                level1: 100,
+                level2: 50,
+                level3: 25,
+                level4: 10
+            }
+        };
+
+        // Gestor del juego
+        const gameManager = {
+            canvas: null,
+            ctx: null,
+            world: null,
+            state: 'menu', // menu, playing, paused, gameover
+            level: 1,
+            lives: 3,
+            score: 0,
+            zoom: 1,
+
+            ship: {
+                body: null,
+                shape: null,
+                hidden: false,
+                invulnerable: false
+            },
+
+            bullets: [],
+            asteroids: [],
+            particles: [],
+
+            keys: {
+                left: false,
+                right: false,
+                up: false,
+                shoot: false
+            },
+
+            lastShootTime: 0,
+
+            init() {
+                // Canvas setup
+                this.canvas = document.getElementById('gameCanvas');
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                this.ctx = this.canvas.getContext('2d');
+
+                // Calcular zoom
+                this.zoom = this.canvas.height / CONFIG.space.height;
+                if (this.canvas.width / CONFIG.space.width < this.zoom) {
+                    this.zoom = this.canvas.width / CONFIG.space.width;
+                }
+
+                this.ctx.lineWidth = 1 / this.zoom;
+                this.ctx.strokeStyle = this.ctx.fillStyle = 'white';
+
+                // p2.js world
+                this.world = new p2.World({ gravity: [0, 0] });
+
+                // Crear nave
+                this.createShip();
+
+                // Event listeners
+                this.setupControls();
+
+                // Colisiones
+                this.setupCollisions();
+
+                // Resize
+                window.addEventListener('resize', () => this.handleResize());
+            },
+
+            createShip() {
+                this.ship.shape = new p2.Circle({ radius: CONFIG.ship.size });
+                this.ship.body = new p2.Body({
+                    mass: 1,
+                    position: [0, 0],
+                    angularVelocity: 0
+                });
+                this.ship.body.damping = this.ship.body.angularDamping = 0;
+                this.ship.body.addShape(this.ship.shape);
+                this.ship.shape.collisionGroup = CONFIG.collision.SHIP;
+                this.ship.shape.collisionMask = CONFIG.collision.ASTEROID;
+                this.world.addBody(this.ship.body);
+            },
+
+            start() {
+                document.getElementById('startScreen').classList.add('hidden');
+                this.state = 'playing';
+                this.level = 1;
+                this.lives = 3;
+                this.score = 0;
+                this.addAsteroids();
+                this.updateHUD();
+                this.animate();
+            },
+
+            restart() {
+                // Limpiar todo
+                this.bullets.forEach(b => this.world.removeBody(b));
+                this.asteroids.forEach(a => this.world.removeBody(a));
+                this.bullets = [];
+                this.asteroids = [];
+                
+                // Resetear nave
+                this.ship.body.position = [0, 0];
+                this.ship.body.velocity = [0, 0];
+                this.ship.body.angle = 0;
+                this.ship.body.angularVelocity = 0;
+                this.ship.hidden = false;
+                this.ship.invulnerable = false;
+
+                document.getElementById('gameOverScreen').classList.add('hidden');
+                this.start();
+            },
+
+            pause() {
+                if (this.state === 'playing') {
+                    this.state = 'paused';
+                    document.getElementById('pauseScreen').classList.remove('hidden');
+                } else if (this.state === 'paused') {
+                    this.state = 'playing';
+                    document.getElementById('pauseScreen').classList.add('hidden');
+                }
+            },
+
+            gameOver() {
+                this.state = 'gameover';
+                document.getElementById('finalScore').textContent = this.score;
+                document.getElementById('finalLevel').textContent = this.level;
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+            },
+
+            addAsteroids() {
+                const count = Math.min(this.level + 2, 8);
+                for (let i = 0; i < count; i++) {
+                    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+                    const distance = 4 + Math.random() * 2;
+                    const x = Math.cos(angle) * distance;
+                    const y = Math.sin(angle) * distance;
+
+                    this.createAsteroid(x, y, 1);
+                }
+            },
+
+            createAsteroid(x, y, level) {
+                const shape = new p2.Circle({
+                    radius: CONFIG.asteroid.radius * (CONFIG.asteroid.levels - level + 1) / CONFIG.asteroid.levels
+                });
+                shape.collisionGroup = CONFIG.collision.ASTEROID;
+                shape.collisionMask = CONFIG.collision.BULLET | CONFIG.collision.SHIP;
+
+                const body = new p2.Body({
+                    mass: 10,
+                    position: [x, y],
+                    velocity: [
+                        (Math.random() - 0.5) * CONFIG.asteroid.maxSpeed,
+                        (Math.random() - 0.5) * CONFIG.asteroid.maxSpeed
+                    ],
+                    angularVelocity: (Math.random() - 0.5) * 2
+                });
+                body.damping = body.angularDamping = 0;
+                body.addShape(shape);
+                body.asteroidLevel = level;
+
+                // Vértices aleatorios para visualización
+                body.verts = [];
+                const radius = shape.radius;
+                for (let j = 0; j < CONFIG.asteroid.verts; j++) {
+                    const angle = (j * 2 * Math.PI) / CONFIG.asteroid.verts;
+                    const variation = (Math.random() - 0.5) * radius * 0.4;
+                    body.verts.push([
+                        radius * Math.cos(angle) + variation,
+                        radius * Math.sin(angle) + variation
+                    ]);
+                }
+
+                this.world.addBody(body);
+                this.asteroids.push(body);
+            },
+
+            shoot() {
+                if (this.ship.hidden || this.bullets.length >= CONFIG.bullet.maxCount) return;
+                if (this.world.time - this.lastShootTime < CONFIG.ship.reloadTime) return;
+
+                const angle = this.ship.body.angle + Math.PI / 2;
+                const bulletBody = new p2.Body({
+                    mass: 0.05,
+                    position: [
+                        this.ship.body.position[0] + CONFIG.ship.size * Math.cos(angle),
+                        this.ship.body.position[1] + CONFIG.ship.size * Math.sin(angle)
+                    ]
+                });
+                bulletBody.damping = bulletBody.angularDamping = 0;
+
+                const bulletShape = new p2.Circle({ radius: CONFIG.bullet.radius });
+                bulletShape.collisionGroup = CONFIG.collision.BULLET;
+                bulletShape.collisionMask = CONFIG.collision.ASTEROID;
+                bulletBody.addShape(bulletShape);
+
+                bulletBody.velocity = [
+                    CONFIG.bullet.speed * Math.cos(angle) + this.ship.body.velocity[0],
+                    CONFIG.bullet.speed * Math.sin(angle) + this.ship.body.velocity[1]
+                ];
+
+                bulletBody.dieTime = this.world.time + CONFIG.bullet.lifeTime;
+                this.world.addBody(bulletBody);
+                this.bullets.push(bulletBody);
+                this.lastShootTime = this.world.time;
+            },
+
+            explodeAsteroid(asteroid) {
+                const idx = this.asteroids.indexOf(asteroid);
+                if (idx === -1) return;
+
+                this.asteroids.splice(idx, 1);
+                this.world.removeBody(asteroid);
+
+                // Puntos según nivel
+                const points = [0, CONFIG.points.level1, CONFIG.points.level2, 
+                               CONFIG.points.level3, CONFIG.points.level4];
+                this.score += points[asteroid.asteroidLevel] || 10;
+
+                // Crear asteroides más pequeños
+                if (asteroid.asteroidLevel < CONFIG.asteroid.levels) {
+                    const count = 3;
+                    for (let i = 0; i < count; i++) {
+                        const angle = (Math.PI * 2 * i) / count + Math.random();
+                        const distance = asteroid.shapes[0].radius * 0.5;
+                        this.createAsteroid(
+                            asteroid.position[0] + Math.cos(angle) * distance,
+                            asteroid.position[1] + Math.sin(angle) * distance,
+                            asteroid.asteroidLevel + 1
+                        );
+                    }
+                }
+
+                // Verificar si nivel completado
+                if (this.asteroids.length === 0) {
+                    this.level++;
+                    this.addAsteroids();
+                }
+
+                this.updateHUD();
+            },
+
+            warp(body) {
+                const p = body.position;
+                const w = CONFIG.space.width / 2;
+                const h = CONFIG.space.height / 2;
+
+                if (p[0] > w) p[0] = -w;
+                if (p[0] < -w) p[0] = w;
+                if (p[1] > h) p[1] = -h;
+                if (p[1] < -h) p[1] = h;
+            },
+
+            updatePhysics() {
+                if (this.state !== 'playing') return;
+
+                // Controles de la nave
+                if (this.keys.left) {
+                    this.ship.body.angularVelocity = CONFIG.ship.turnSpeed;
+                } else if (this.keys.right) {
+                    this.ship.body.angularVelocity = -CONFIG.ship.turnSpeed;
+                } else {
+                    this.ship.body.angularVelocity = 0;
+                }
+
+                if (this.keys.up) {
+                    this.ship.body.applyForceLocal([0, 2]);
+                }
+
+                if (this.keys.shoot) {
+                    this.shoot();
+                }
+
+                // Limpiar balas viejas
+                this.bullets = this.bullets.filter(b => {
+                    if (b.dieTime <= this.world.time) {
+                        this.world.removeBody(b);
+                        return false;
+                    }
+                    this.warp(b);
+                    return true;
+                });
+
+                // Warp asteroides y nave
+                this.asteroids.forEach(a => this.warp(a));
+                this.warp(this.ship.body);
+
+                this.world.step(1 / 60);
+            },
+
+            render() {
+                const { ctx, canvas } = this;
+                
+                // Limpiar
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Transformar
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(this.zoom, -this.zoom);
+
+                // Dibujar límites
+                this.drawBounds();
+
+                // Dibujar asteroides
+                this.asteroids.forEach(a => this.drawAsteroid(a));
+
+                // Dibujar balas
+                this.bullets.forEach(b => this.drawBullet(b));
+
+                // Dibujar nave
+                if (!this.ship.hidden) {
+                    this.drawShip();
+                }
+
+                ctx.restore();
+            },
+
+            drawShip() {
+                const { ctx } = this;
+                const body = this.ship.body;
+                const r = CONFIG.ship.size;
+
+                ctx.save();
+                ctx.translate(body.position[0], body.position[1]);
+                ctx.rotate(body.angle);
+
+                // Nave
+                ctx.beginPath();
+                ctx.moveTo(0, r);
+                ctx.lineTo(-r * 0.6, -r);
+                ctx.lineTo(r * 0.6, -r);
+                ctx.closePath();
+                ctx.stroke();
+
+                // Motor (si acelera)
+                if (this.keys.up) {
+                    ctx.beginPath();
+                    ctx.moveTo(-r * 0.3, -r);
+                    ctx.lineTo(0, -r * 1.5);
+                    ctx.lineTo(r * 0.3, -r);
+                    ctx.strokeStyle = '#ff6600';
+                    ctx.stroke();
+                    ctx.strokeStyle = 'white';
+                }
+
+                ctx.restore();
+            },
+
+            drawAsteroid(asteroid) {
+                const { ctx } = this;
+                ctx.save();
+                ctx.translate(asteroid.position[0], asteroid.position[1]);
+                ctx.rotate(asteroid.angle);
+
+                ctx.beginPath();
+                asteroid.verts.forEach((v, i) => {
+                    if (i === 0) ctx.moveTo(v[0], v[1]);
+                    else ctx.lineTo(v[0], v[1]);
+                });
+                ctx.closePath();
+                ctx.stroke();
+
+                ctx.restore();
+            },
+
+            drawBullet(bullet) {
+                const { ctx } = this;
+                ctx.beginPath();
+                ctx.arc(bullet.position[0], bullet.position[1], CONFIG.bullet.radius, 0, Math.PI * 2);
+                ctx.fill();
+            },
+
+            drawBounds() {
+                const { ctx } = this;
+                const w = CONFIG.space.width / 2;
+                const h = CONFIG.space.height / 2;
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1 / this.zoom;
+                ctx.beginPath();
+                ctx.rect(-w, -h, CONFIG.space.width, CONFIG.space.height);
+                ctx.stroke();
+                ctx.strokeStyle = 'white';
+            },
+
+            setupCollisions() {
+                this.world.on('impact', (evt) => {
+                    const { bodyA, bodyB } = evt;
+
+                    // Nave colisiona con asteroide
+                    if (!this.ship.invulnerable && 
+                        (bodyA === this.ship.body || bodyB === this.ship.body)) {
+                        const other = bodyA === this.ship.body ? bodyB : bodyA;
+                        if (this.asteroids.includes(other)) {
+                            this.lives--;
+                            this.updateHUD();
+                            this.respawnShip();
+                        }
+                    }
+
+                    // Bala colisiona con asteroide
+                    const bullet = this.bullets.find(b => b === bodyA || b === bodyB);
+                    const asteroid = this.asteroids.find(a => a === bodyA || a === bodyB);
+                    
+                    if (bullet && asteroid) {
+                        const idx = this.bullets.indexOf(bullet);
+                        if (idx !== -1) {
+                            this.bullets.splice(idx, 1);
+                            this.world.removeBody(bullet);
+                        }
+                        this.explodeAsteroid(asteroid);
+                    }
+                });
+            },
+
+            respawnShip() {
+                if (this.lives <= 0) {
+                    this.gameOver();
+                    return;
+                }
+
+                this.ship.hidden = true;
+                this.ship.invulnerable = true;
+                this.world.removeBody(this.ship.body);
+
+                setTimeout(() => {
+                    this.ship.body.position = [0, 0];
+                    this.ship.body.velocity = [0, 0];
+                    this.ship.body.angle = 0;
+                    this.ship.body.angularVelocity = 0;
+                    this.ship.hidden = false;
+                    this.world.addBody(this.ship.body);
+
+                    setTimeout(() => {
+                        this.ship.invulnerable = false;
+                    }, 2000);
+                }, 2000);
+            },
+
+            setupControls() {
+                // Teclado
+                window.addEventListener('keydown', (e) => {
+                    if (this.state === 'menu') return;
+                    
+                    switch (e.keyCode) {
+                        case 37: this.keys.left = true; break;
+                        case 39: this.keys.right = true; break;
+                        case 38: this.keys.up = true; break;
+                        case 32: this.keys.shoot = true; e.preventDefault(); break;
+                        case 80: this.pause(); break; // P
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    switch (e.keyCode) {
+                        case 37: this.keys.left = false; break;
+                        case 39: this.keys.right = false; break;
+                        case 38: this.keys.up = false; break;
+                        case 32: this.keys.shoot = false; break;
+                    }
+                });
+
+                // Controles móviles
+                const setupMobileBtn = (id, key) => {
+                    const btn = document.getElementById(id);
+                    btn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        this.keys[key] = true;
+                    });
+                    btn.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        this.keys[key] = false;
+                    });
+                };
+
+                setupMobileBtn('btnLeft', 'left');
+                setupMobileBtn('btnRight', 'right');
+                setupMobileBtn('btnUp', 'up');
+                setupMobileBtn('btnShoot', 'shoot');
+            },
+
+            updateHUD() {
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('lives').textContent = this.lives;
+                document.getElementById('score').textContent = this.score;
+            },
+
+            handleResize() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                this.zoom = this.canvas.height / CONFIG.space.height;
+                if (this.canvas.width / CONFIG.space.width < this.zoom) {
+                    this.zoom = this.canvas.width / CONFIG.space.width;
+                }
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.updatePhysics();
+                this.render();
+            }
+        };
+
+        // Inicializar cuando cargue
+        window.addEventListener('load', () => {
+            gameManager.init();
+        });
+    </script>
+</body>
+</html>
